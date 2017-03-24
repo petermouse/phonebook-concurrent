@@ -48,9 +48,8 @@ int main(int argc, char *argv[])
     FILE *fp;
     int i = 0;
     char line[MAX_LAST_NAME_SIZE];
-#else
-    struct timespec mid;
 #endif
+
     struct timespec start, end;
     double cpu_time1, cpu_time2;
 
@@ -72,59 +71,10 @@ int main(int argc, char *argv[])
     entry *pHead, *e;
     printf("size of entry : %lu bytes\n", sizeof(entry));
 
-#if defined(OPT)
-    char *map;
-    entry *entry_pool;
-    pthread_t threads[THREAD_NUM];
-    thread_arg *thread_args[THREAD_NUM];
-
-    /* Start timing */
-    clock_gettime(CLOCK_REALTIME, &start);
-    /* Allocate the resource at first */
-    map = mmap(NULL, file_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-    assert(map && "mmap error");
-    entry_pool = (entry *)malloc(sizeof(entry) *
-                                 file_size / MAX_LAST_NAME_SIZE);
-    assert(entry_pool && "entry_pool error");
-
-    /* Prepare for multi-threading */
-    pthread_setconcurrency(THREAD_NUM + 1);
-    for (int i = 0; i < THREAD_NUM; i++)
-        // Created by malloc, remeber to free them.
-        thread_args[i] = createThread_arg(map + MAX_LAST_NAME_SIZE * i, map + file_size, i,
-                                          THREAD_NUM, entry_pool + i);
-    /* Deliver the jobs to all threads and wait for completing */
-    clock_gettime(CLOCK_REALTIME, &mid);
-    for (int i = 0; i < THREAD_NUM; i++)
-        pthread_create(&threads[i], NULL, (void *)&append, (void *)thread_args[i]);
-
-    for (int i = 0; i < THREAD_NUM; i++)
-        pthread_join(threads[i], NULL);
-
-    /* Connect the linked list of each thread */
-    for (int i = 0; i < THREAD_NUM; i++) {
-        if (i == 0) {
-            pHead = thread_args[i]->lEntry_head->pNext;
-            DEBUG_LOG("Connect %d head string %s %p\n", i,
-                      pHead->lastName, thread_args[i]->data_begin);
-        } else {
-            e->pNext = thread_args[i]->lEntry_head->pNext;
-            DEBUG_LOG("Connect %d head string %s %p\n", i,
-                      e->pNext->lastName, thread_args[i]->data_begin);
-        }
-
-        e = thread_args[i]->lEntry_tail;
-        DEBUG_LOG("Connect %d tail string %s %p\n", i,
-                  e->lastName, thread_args[i]->data_begin);
-        DEBUG_LOG("round %d\n", i);
-    }
-    /* Stop timing */
-    clock_gettime(CLOCK_REALTIME, &end);
-#else /* ! OPT */
+#ifndef OPT
     pHead = (entry *) malloc(sizeof(entry));
     e = pHead;
     e->pNext = NULL;
-
 #if defined(__GNUC__)
     __builtin___clear_cache((char *) pHead, (char *) pHead + sizeof(entry));
 #endif
@@ -144,6 +94,53 @@ int main(int argc, char *argv[])
 
     /* close file as soon as possible */
     fclose(fp);
+#else
+    char *map;
+    entry *entry_pool;
+    pthread_t threads[THREAD_NUM];
+    thread_arg *thread_args[THREAD_NUM];
+
+    /* Start timing */
+    clock_gettime(CLOCK_REALTIME, &start);
+    /* Allocate the resource at first */
+    map = mmap(NULL, file_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    assert(map && "mmap error");
+    entry_pool = (entry *)malloc(sizeof(entry) *
+                                 file_size / MAX_LAST_NAME_SIZE);
+    assert(entry_pool && "entry_pool error");
+
+    /* Prepare for multi-threading */
+    pthread_setconcurrency(THREAD_NUM + 1);
+    for (int i = 0; i < THREAD_NUM; i++)
+        // Created by malloc, remember to free them.
+        thread_args[i] = createThread_arg(map + MAX_LAST_NAME_SIZE * i, map + file_size, i,
+                                          THREAD_NUM, entry_pool + i);
+    /* Deliver the jobs to all threads and wait for completing */
+    for (int i = 0; i < THREAD_NUM; i++)
+        pthread_create(&threads[i], NULL, (void *)&append, (void *)thread_args[i]);
+
+    for (int i = 0; i < THREAD_NUM; i++)
+        pthread_join(threads[i], NULL);
+
+    /* Connect the linked list of each thread */
+    for (int i = 0; i < THREAD_NUM; i++) {
+        if (i == 0) {
+            pHead = thread_args[i]->lEntry_head;
+            DEBUG_LOG("Connect %d head string %s %p\n", i,
+                      pHead->lastName, thread_args[i]->data_begin);
+        } else {
+            e->pNext = thread_args[i]->lEntry_head;
+            DEBUG_LOG("Connect %d head string %s %p\n", i,
+                      e->pNext->lastName, thread_args[i]->data_begin);
+        }
+
+        e = thread_args[i]->lEntry_tail;
+        DEBUG_LOG("Connect %d tail string %s %p\n", i,
+                  e->lastName, thread_args[i]->data_begin);
+        DEBUG_LOG("round %d\n", i);
+    }
+    /* Stop timing */
+    clock_gettime(CLOCK_REALTIME, &end);
 #endif
 
     cpu_time1 = diff_in_second(start, end);
@@ -197,5 +194,6 @@ int main(int argc, char *argv[])
     munmap(map, file_size);
     close(fd);
 #endif
+
     return 0;
 }
