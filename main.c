@@ -11,18 +11,39 @@
 
 #include IMPL
 
+/* original version*/
 #ifndef OPT
 #define OUTPUT_FILE "orig.txt"
 
+
+/* optimization version*/
 #else
+
 #include "text_align.h"
 #include "debug.h"
 #include <fcntl.h>
 #define ALIGN_FILE "align.txt"
-#define OUTPUT_FILE "opt.txt"
 
 #ifndef THREAD_NUM
 #define THREAD_NUM 4
+#endif
+
+/* thread pool implementation in optimized version*/
+#ifdef THREAD_POOL
+
+#include "threadpool.h"
+#define OUTPUT_FILE "tp.txt"
+#ifndef QUEUE_SIZE
+#define QUEUE_SIZE 1024
+#endif
+#ifndef TASK_NUM
+#define TASK_NUM 4
+#endif
+
+#else /*original optimized version*/
+
+#define OUTPUT_FILE "opt.txt"
+
 #endif
 
 #endif
@@ -98,7 +119,6 @@ int main(int argc, char *argv[])
     char *map;
     entry *entry_pool;
     pthread_t threads[THREAD_NUM];
-    thread_arg *thread_args[THREAD_NUM];
 
     /* Start timing */
     clock_gettime(CLOCK_REALTIME, &start);
@@ -111,6 +131,8 @@ int main(int argc, char *argv[])
 
     /* Prepare for multi-threading */
     pthread_setconcurrency(THREAD_NUM + 1);
+#ifndef THREAD_POOL
+    thread_arg *thread_args[THREAD_NUM];
     for (int i = 0; i < THREAD_NUM; i++)
         // Created by malloc, remember to free them.
         thread_args[i] = createThread_arg(map + MAX_LAST_NAME_SIZE * i, map + file_size, i,
@@ -121,9 +143,27 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < THREAD_NUM; i++)
         pthread_join(threads[i], NULL);
+#else
+    thread_arg *thread_args[TASK_NUM];
+    for (int i = 0; i < TASK_NUM; i++)
+        thread_args[i] = createThread_arg(map + MAX_LAST_NAME_SIZE * i, map + file_size, i,
+                                          TASK_NUM, entry_pool + i);
 
+    /* thread pool implementation in optimized version*/
+    DEBUG_LOG("Use thread pool\n");
+    threadpool_t *tp = threadpool_create(THREAD_NUM, QUEUE_SIZE, 0);
+    assert(tp && "thread pool error");
+    for (int i = 0; i < TASK_NUM; i++)
+        threadpool_add(tp, (void *)&append, (void *)thread_args[i], 0);
+    threadpool_destroy(tp, 1);
+#endif
+
+#ifndef THREAD_POOL
     /* Connect the linked list of each thread */
     for (int i = 0; i < THREAD_NUM; i++) {
+#else
+    for (int i = 0; i < TASK_NUM; i++) {
+#endif
         if (i == 0) {
             pHead = thread_args[i]->lEntry_head;
             DEBUG_LOG("Connect %d head string %s %p\n", i,
@@ -141,6 +181,7 @@ int main(int argc, char *argv[])
     }
     /* Stop timing */
     clock_gettime(CLOCK_REALTIME, &end);
+    //show_entry(e = pHead);
 #endif
 
     cpu_time1 = diff_in_second(start, end);
@@ -188,9 +229,12 @@ int main(int argc, char *argv[])
     }
 
     free(entry_pool);
+#ifndef THREAD_POOL
     for (int i = 0; i < THREAD_NUM; ++i)
+#else
+    for (int i = 0; i < TASK_NUM; ++i)
+#endif
         free(thread_args[i]);
-
     munmap(map, file_size);
     close(fd);
 #endif

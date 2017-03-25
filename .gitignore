@@ -5,14 +5,11 @@
 *.list
 *.swp
 *.bak
+*.txt
 phonebook_opt
 phonebook_orig
+phonebook_tp
 calculate
-orig.txt
-opt.txt
-output.txt
 runtime.png
-*aligned.txt
 text_align
-align.txt
 gmon.out

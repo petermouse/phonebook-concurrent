@@ -2,6 +2,7 @@ CC ?= gcc
 CFLAGS_common ?= -Wall -std=gnu99
 CFLAGS_orig = -O0
 CFLAGS_opt  = -O0 -pthread -g
+CFLAGS_tp = -O0 -pthread -g
 
 ifdef CHECK_LEAK
 CFLAGS_common += -fsanitize=address -fno-omit-frame-pointer
@@ -11,15 +12,25 @@ ifdef THREAD
 CFLAGS_opt  += -D THREAD_NUM=${THREAD}
 endif
 
+ifdef QUEUE
+CFLAGS_tp += -D QUEUE_SIZE=${QUEUE}
+endif
+
+ifdef TASK
+CFLAGS_tp += -D TASK_NUM=${TASK}
+endif
+
 ifeq ($(strip $(PROFILE)),1)
 CFLAGS_opt += -pg
+CFLAGS_tp += -pg
 endif
 
 ifeq ($(strip $(DEBUG)),1)
-CFLAGS_opt += -DDEBUG -g
+CFLAGS_opt += -DDEBUG
+CFLAGS_tp += -DDEBUG
 endif
 
-EXEC = phonebook_orig phonebook_opt
+EXEC = phonebook_orig phonebook_opt phonebook_tp
 GIT_HOOKS := .git/hooks/applied
 .PHONY: all
 all: $(GIT_HOOKS) $(EXEC)
@@ -43,6 +54,11 @@ phonebook_opt: $(SRCS_common) phonebook_opt.c phonebook_opt.h text_align.c
 		-DIMPL="\"$@.h\"" -o $@ \
 		$(SRCS_common) $@.c text_align.c
 
+phonebook_tp: $(SRCS_common) phonebook_opt.c phonebook_opt.h text_align.c threadpool.h threadpool.c
+	$(CC) $(CFLAGS_common) $(CFLAGS_tp) \
+		-DIMPL="\"phonebook_opt.h\"" -DTHREAD_POOL -o $@ \
+		$(SRCS_common) phonebook_opt.c text_align.c threadpool.c
+
 run: $(EXEC)
 	echo 3 | sudo tee /proc/sys/vm/drop_caches
 	watch -d -t "./phonebook_orig && echo 3 | sudo tee /proc/sys/vm/drop_caches"
@@ -54,6 +70,9 @@ cache-test: $(EXEC)
 	perf stat --repeat 100 \
 		-e cache-misses,cache-references,instructions,cycles \
 		./phonebook_opt
+	perf stat --repeat 100 \
+		-e cache-misses,cache-references,instructions,cycles \
+		./phonebook_tp
 
 output.txt: cache-test calculate
 	./calculate
@@ -66,5 +85,5 @@ calculate: calculate.c
 
 .PHONY: clean
 clean:
-	$(RM) $(EXEC) *.o perf.* \
-	      	calculate orig.txt opt.txt output.txt runtime.png align.txt
+	$(RM) $(EXEC) *.o perf.* *.txt\
+		calculate runtime.png gmon.out

@@ -69,8 +69,9 @@ void append(void *arg)
     cpu_time = diff_in_second(start, end);
 
     DEBUG_LOG("thread take %lf sec, count %d\n", cpu_time, count);
-
+#ifndef THREAD_POOL
     pthread_exit(NULL);
+#endif
 }
 
 void show_entry(entry *pHead)
