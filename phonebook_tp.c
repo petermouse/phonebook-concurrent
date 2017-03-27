@@ -28,9 +28,8 @@ entry *task_findName(void *arg)
 {
     task_arg *t_arg = (task_arg *)arg;
     entry* e = t_arg->lEntry_head;
-    //int count = 0;
     size_t len = strlen(t_arg->lastName);
-    while (/*count++ < t_arg->entryCount*/e) {
+    while (e) {
         if (strncasecmp(t_arg->lastName, e->lastName, len) == 0
                 && (e->lastName[len] == '\n' ||
                     e->lastName[len] == '\0')) {
@@ -54,7 +53,6 @@ task_arg *createTask_arg(char *data_begin, char *data_end,
     new_arg->data_begin = data_begin;
     new_arg->data_end = data_end;
     new_arg->numOfTask = numOfTask;
-    //new_arg->entryCount = 0;
     new_arg->lEntryPool_begin = new_arg->lEntry_head = new_arg->lEntry_tail = entryPool;
     return new_arg;
 }
@@ -82,7 +80,6 @@ void task_append(void *arg)
         t_arg->lEntry_tail->lastName = i;
         t_arg->lEntry_tail->pNext = NULL;
         t_arg->lEntry_tail->dtl = NULL;
-        //t_arg->entryCount++;
     }
     clock_gettime(CLOCK_REALTIME, &end);
     cpu_time = diff_in_second(start, end);

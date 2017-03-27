@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 #if defined(__GNUC__)
     __builtin___clear_cache((char *) pHead, (char *) pHead + sizeof(entry));
 #endif
-    /* Start timing */
+    /* Start measuring time*/
     clock_gettime(CLOCK_REALTIME, &start);
 
     while (fgets(line, sizeof(line), fp)) {
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
         e = append(line, e);
     }
 
-    /* Stop timing */
+    /* Stop measuring time*/
     clock_gettime(CLOCK_REALTIME, &end);
 
     /* close file as soon as possible */
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
     entry *entry_pool;
     pthread_t threads[THREAD_NUM];
 
-    /* Start timing */
+    /* Start measuring time */
     clock_gettime(CLOCK_REALTIME, &start);
     /* Allocate the resource at first */
     map = mmap(NULL, file_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
     }
 #endif
 #endif
-    /* Stop timing*/
+    /* Stop measuring time*/
     clock_gettime(CLOCK_REALTIME, &end);
     cpu_time1 = diff_in_second(start, end);
 

@@ -35,7 +35,6 @@ typedef struct _task_argument {
     char *data_end;
     char lastName[MAX_LAST_NAME_SIZE];
     int numOfTask;
-    //int entryCount;
     entry *lEntryPool_begin;    /* The local entry pool */
     entry *lEntry_head; /* local entry linked list */
     entry *lEntry_tail; /* local entry linked list */
