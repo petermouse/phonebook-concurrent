@@ -54,10 +54,10 @@ phonebook_opt: $(SRCS_common) phonebook_opt.c phonebook_opt.h text_align.c
 		-DIMPL="\"$@.h\"" -o $@ \
 		$(SRCS_common) $@.c text_align.c
 
-phonebook_tp: $(SRCS_common) phonebook_opt.c phonebook_opt.h text_align.c threadpool.h threadpool.c
+phonebook_tp: $(SRCS_common) phonebook_tp.c phonebook_tp.h text_align.c threadpool.h threadpool.c
 	$(CC) $(CFLAGS_common) $(CFLAGS_tp) \
-		-DIMPL="\"phonebook_opt.h\"" -DTHREAD_POOL -o $@ \
-		$(SRCS_common) phonebook_opt.c text_align.c threadpool.c
+		-DIMPL="\"$@.h\"" -DTHREAD_POOL -o $@ \
+		$(SRCS_common) $@.c text_align.c threadpool.c
 
 run: $(EXEC)
 	echo 3 | sudo tee /proc/sys/vm/drop_caches

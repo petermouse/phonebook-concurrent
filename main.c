@@ -15,7 +15,6 @@
 #ifndef OPT
 #define OUTPUT_FILE "orig.txt"
 
-
 /* optimization version*/
 #else
 
@@ -30,12 +29,14 @@
 
 /* thread pool implementation in optimized version*/
 #ifdef THREAD_POOL
-
 #include "threadpool.h"
+
 #define OUTPUT_FILE "tp.txt"
+
 #ifndef QUEUE_SIZE
 #define QUEUE_SIZE 1024
 #endif
+
 #ifndef TASK_NUM
 #define TASK_NUM 4
 #endif
@@ -144,26 +145,23 @@ int main(int argc, char *argv[])
     for (int i = 0; i < THREAD_NUM; i++)
         pthread_join(threads[i], NULL);
 #else
-    thread_arg *thread_args[TASK_NUM];
+    task_arg *task_args[TASK_NUM];
     for (int i = 0; i < TASK_NUM; i++)
-        thread_args[i] = createThread_arg(map + MAX_LAST_NAME_SIZE * i, map + file_size, i,
-                                          TASK_NUM, entry_pool + i);
+        task_args[i] = createTask_arg(map + MAX_LAST_NAME_SIZE * i,
+                                      map + file_size, TASK_NUM, entry_pool + i);
 
     /* thread pool implementation in optimized version*/
     DEBUG_LOG("Use thread pool\n");
     threadpool_t *tp = threadpool_create(THREAD_NUM, QUEUE_SIZE, 0);
     assert(tp && "thread pool error");
     for (int i = 0; i < TASK_NUM; i++)
-        threadpool_add(tp, (void *)&append, (void *)thread_args[i], 0);
-    threadpool_destroy(tp, 1);
+        threadpool_add(tp, (void *)&task_append, (void *)task_args[i], 0);
+    threadpool_destroy(tp, 1); //graceful terminate
 #endif
 
 #ifndef THREAD_POOL
     /* Connect the linked list of each thread */
     for (int i = 0; i < THREAD_NUM; i++) {
-#else
-    for (int i = 0; i < TASK_NUM; i++) {
-#endif
         if (i == 0) {
             pHead = thread_args[i]->lEntry_head;
             DEBUG_LOG("Connect %d head string %s %p\n", i,
@@ -179,18 +177,18 @@ int main(int argc, char *argv[])
                   e->lastName, thread_args[i]->data_begin);
         DEBUG_LOG("round %d\n", i);
     }
-    /* Stop timing */
-    clock_gettime(CLOCK_REALTIME, &end);
-    //show_entry(e = pHead);
 #endif
-
+#endif
+    /* Stop timing*/
+    clock_gettime(CLOCK_REALTIME, &end);
     cpu_time1 = diff_in_second(start, end);
 
     /* Find the given entry */
     /* the givn last name to find */
     char input[MAX_LAST_NAME_SIZE] = "zyxel";
-    e = pHead;
 
+#ifndef THREAD_POOL
+    e = pHead;
     assert(findName(input, e) &&
            "Did you implement findName() in " IMPL "?");
     assert(0 == strcmp(findName(input, e)->lastName, "zyxel"));
@@ -198,9 +196,21 @@ int main(int argc, char *argv[])
 #if defined(__GNUC__)
     __builtin___clear_cache((char *) pHead, (char *) pHead + sizeof(entry));
 #endif
+
+#endif
     /* Compute the execution time */
     clock_gettime(CLOCK_REALTIME, &start);
+#ifndef THREAD_POOL
     findName(input, e);
+#else
+    tp = threadpool_create(THREAD_NUM, QUEUE_SIZE, 0);
+    assert(tp && "thread pool error");
+    for (int i = 0; i < TASK_NUM; i++) {
+        strcpy(task_args[i]->lastName, input);
+        threadpool_add(tp, (void *)&task_findName, (void *)task_args[i], 0);
+    }
+    threadpool_destroy(tp, 1); //graceful terminate
+#endif
     clock_gettime(CLOCK_REALTIME, &end);
     cpu_time2 = diff_in_second(start, end);
 
@@ -221,23 +231,33 @@ int main(int argc, char *argv[])
         free(e);
     }
 #else
+
+#ifndef THREAD_POOL
     /* Free the allocated detail entry */
     e = pHead;
     while (e) {
         free(e->dtl);
         e = e->pNext;
     }
-
+#else
+    for (int i = 0; i < TASK_NUM; ++i) {
+        e = task_args[i]->lEntry_head;
+        while(e) {
+            free(e->dtl);
+            e = e->pNext;
+        }
+    }
+#endif
     free(entry_pool);
 #ifndef THREAD_POOL
     for (int i = 0; i < THREAD_NUM; ++i)
+        free(thread_args[i]);
 #else
     for (int i = 0; i < TASK_NUM; ++i)
+        free(task_args[i]);
 #endif
-        free(thread_args[i]);
     munmap(map, file_size);
     close(fd);
 #endif
-
     return 0;
 }
